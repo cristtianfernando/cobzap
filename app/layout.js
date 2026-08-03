@@ -1,9 +1,9 @@
 import './globals.css';
 
 export const metadata = {
-  title: 'CobZap | Sistema de Cobrança via WhatsApp com API Oficial Meta',
-  description: 'CobZap é o sistema de cobrança via WhatsApp mais completo do Brasil. Use a API Oficial da Meta ou WhatsApp Web para automatizar réguas de cobrança, recuperar dívidas e reduzir inadimplência. A partir de R$47/usuário/mês. Compatível com LGPD.',
-  keywords: 'sistema de cobrança WhatsApp, API WhatsApp cobrança, API oficial Meta cobrança, assessoria de cobrança WhatsApp, escritório de cobrança WhatsApp, call center cobrança WhatsApp, telemarketing cobrança WhatsApp, régua de cobrança WhatsApp, automação de cobrança WhatsApp, recuperação de dívidas WhatsApp, cobzap, disparo em massa WhatsApp, inadimplência WhatsApp, cobrança ativa WhatsApp, recuperação de crédito WhatsApp',
+  title: 'CobZap | Plataforma de WhatsApp para Operações de Cobrança',
+  description: 'CobZap é a plataforma de WhatsApp para operações de cobrança: atendimento, disparo em massa e automação, via API Oficial da Meta ou WhatsApp Web. Conecta ao sistema de cobrança que você já usa. A partir de R$47/usuário/mês.',
+  keywords: 'sistema de cobrança WhatsApp, plataforma de WhatsApp para cobrança, API WhatsApp cobrança, API oficial Meta cobrança, assessoria de cobrança WhatsApp, escritório de cobrança WhatsApp, WhatsApp para escritório de advocacia, call center cobrança WhatsApp, telemarketing cobrança WhatsApp, régua de cobrança WhatsApp, automação de cobrança WhatsApp, recuperação de dívidas WhatsApp, cobzap, disparo em massa WhatsApp, risco de bloqueio WhatsApp cobrança, inadimplência WhatsApp, cobrança ativa WhatsApp',
   metadataBase: new URL('https://www.cobzap.com'),
   alternates: {
     canonical: '/',
@@ -11,8 +11,8 @@ export const metadata = {
   openGraph: {
     type: 'website',
     url: '/',
-    title: 'CobZap | Sistema de Cobrança via WhatsApp com API Oficial Meta',
-    description: 'Automatize cobranças pelo WhatsApp com API Oficial da Meta ou WhatsApp Web. Régua de cobrança, disparo em massa e dashboard em tempo real. A partir de R$47/usuário/mês.',
+    title: 'CobZap | Plataforma de WhatsApp para Operações de Cobrança',
+    description: 'Atendimento, disparo em massa e automação de cobrança em WhatsApp. Conecta ao seu sistema, sem substituir. A partir de R$47/usuário/mês.',
     images: [
       {
         url: '/logo.png',
@@ -24,8 +24,8 @@ export const metadata = {
   twitter: {
     card: 'summary_large_image',
     url: '/',
-    title: 'CobZap | Sistema de Cobrança via WhatsApp com API Oficial Meta',
-    description: 'Automatize cobranças pelo WhatsApp. API Oficial Meta ou WhatsApp Web. A partir de R$47/usuário/mês.',
+    title: 'CobZap | Plataforma de WhatsApp para Operações de Cobrança',
+    description: 'Atendimento, disparo em massa e automação de cobrança em WhatsApp. Conecta ao seu sistema, sem substituir.',
     images: ['/logo.png'],
   },
 };
@@ -40,7 +40,7 @@ export default function RootLayout({ children }) {
     "logo": "https://www.cobzap.com/logo.png",
     "operatingSystem": "All",
     "applicationCategory": "BusinessApplication",
-    "description": "CobZap é um sistema de cobrança via WhatsApp que conecta a API Oficial da Meta (Cloud API) ou WhatsApp Web para automatizar régua de cobrança, disparo em massa e gestão de devedores, com dashboard de performance em tempo real e conformidade com LGPD.",
+    "description": "CobZap é uma plataforma de WhatsApp para operações de cobrança. Fornece atendimento multiagente, disparo em massa e régua automatizada, via API Oficial da Meta (WhatsApp Business Cloud API) ou WhatsApp Web. Conecta a sistemas de cobrança e CRM existentes via API REST e Webhooks, sem substituí-los.",
     "offers": {
       "@type": "AggregateOffer",
       "priceCurrency": "BRL",
@@ -49,15 +49,15 @@ export default function RootLayout({ children }) {
       "offerCount": "6"
     },
     "featureList": [
+      "Atendimento multiagente com fila e ticket",
+      "Disparo em massa com variáveis dinâmicas",
+      "Régua de cobrança automatizada",
       "API Oficial do WhatsApp da Meta (Cloud API)",
       "Integração via WhatsApp Web (QR Code)",
-      "Régua de cobrança automatizada",
-      "Disparo em massa de mensagens personalizadas",
       "Dashboard de performance em tempo real",
       "Relatórios avançados por usuário e fila",
       "Webhooks e API REST para integração com ERP/CRM",
       "Conformidade com LGPD",
-      "Multi-atendentes simultâneos",
       "Histórico completo de conversas"
     ]
   };
@@ -90,7 +90,7 @@ export default function RootLayout({ children }) {
     "@type": "WebSite",
     "name": "CobZap",
     "url": "https://www.cobzap.com",
-    "description": "Sistema de cobrança via WhatsApp com API Oficial Meta e WhatsApp Web. Automatize réguas de cobrança e reduza inadimplência.",
+    "description": "Plataforma de WhatsApp para operações de cobrança, com API Oficial da Meta e WhatsApp Web. Atendimento, disparo em massa e automação, conectados ao sistema de cobrança que você já usa.",
     "inLanguage": "pt-BR"
   };
 

@@ -1,109 +1,117 @@
-import mysql from 'mysql2/promise';
+import { createHash } from 'node:crypto';
+import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
-export async function OPTIONS() {
-  return new NextResponse(null, {
-    status: 200,
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS, PUT, PATCH, DELETE',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    },
-  });
-}
+const allowedOrigins = new Set([
+  'https://cobzap.com',
+  'https://www.cobzap.com',
+  process.env.SITE_URL,
+  process.env.VERCEL_URL && `https://${process.env.VERCEL_URL}`,
+  process.env.NODE_ENV !== 'production' && 'http://localhost:3000',
+].filter(Boolean));
+
+const allowedRoles = new Set([
+  'Sócio Proprietário',
+  'Diretor',
+  'Superintendente',
+  'Gerente',
+  'Coordenador',
+  'Supervisor',
+  'Analista',
+  'Outro',
+]);
+const allowedTeamSizes = new Set(['1 a 5', '5 a 10', '10 a 20', '20 a 50', '50 a 100', '100+']);
+const emailPattern = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+
+const clean = (value, maxLength) => typeof value === 'string' ? value.trim().slice(0, maxLength) : '';
 
 export async function POST(request) {
+  const origin = request.headers.get('origin');
+  if (!origin || !allowedOrigins.has(origin)) {
+    return NextResponse.json({ success: false, message: 'Origem não autorizada.' }, { status: 403 });
+  }
+
+  if (!request.headers.get('content-type')?.toLowerCase().startsWith('application/json')) {
+    return NextResponse.json({ success: false, message: 'Conteúdo inválido.' }, { status: 415 });
+  }
+
   try {
-    const data = await request.json();
+    const body = await request.text();
+    if (body.length > 8_192) {
+      return NextResponse.json({ success: false, message: 'Conteúdo inválido.' }, { status: 413 });
+    }
 
-    const nome = (data.nome || '').trim();
-    const email = (data.email || '').trim();
-    const whatsapp = (data.telefone_formatado || data.telefone || data.whatsapp || '').trim();
-    const cargo = (data.cargo || '').trim();
-    const tamanho_time = (data.tamanho_time || data.tamanho_equipe || '').trim();
-    const origem = (data.origem || 'gate-cobchat').trim();
+    let data;
+    try {
+      data = JSON.parse(body);
+    } catch {
+      return NextResponse.json({ success: false, message: 'Conteúdo inválido.' }, { status: 400 });
+    }
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return NextResponse.json({ success: false, message: 'Conteúdo inválido.' }, { status: 400 });
+    }
+    if (clean(data.website, 100)) {
+      return NextResponse.json({ success: true, message: 'Dados salvos com sucesso!' });
+    }
 
-    // Validação
-    const missingFields = [];
-    if (!nome) missingFields.push('nome');
-    if (!email) missingFields.push('email');
-    if (!whatsapp) missingFields.push('telefone');
-    if (!cargo) missingFields.push('cargo');
-    if (!tamanho_time) missingFields.push('tamanho_time');
+    const forwardedFor = request.headers.get('x-forwarded-for');
+    const ip = clean(forwardedFor?.split(',')[0], 45);
+    if (!ip) {
+      return NextResponse.json({ success: false, message: 'Requisição inválida.' }, { status: 400 });
+    }
 
-    if (missingFields.length > 0) {
+    const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+    const clientKey = createHash('sha256').update(ip).digest('hex');
+    const { data: allowed, error: rateLimitError } = await supabase.rpc('consume_lead_rate_limit', {
+      p_client_key: clientKey,
+      p_limit: 5,
+    });
+
+    if (rateLimitError) throw rateLimitError;
+    if (!allowed) {
       return NextResponse.json(
-        {
-          success: false,
-          message: `Campos obrigatórios ausentes: ${missingFields.join(', ')}`,
-        },
-        {
-          status: 400,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-          },
-        }
+        { success: false, message: 'Muitas tentativas. Tente novamente mais tarde.' },
+        { status: 429, headers: { 'Retry-After': '3600' } }
       );
     }
 
-    // Obter IP e User Agent a partir dos headers
-    const ip_usuario = request.headers.get('x-forwarded-for') || '';
-    const user_agent = request.headers.get('user-agent') || '';
+    const nome = clean(data.nome, 100);
+    const email = clean(data.email, 100).toLowerCase();
+    const whatsapp = clean(data.telefone_formatado || data.telefone || data.whatsapp, 20);
+    const cargo = clean(data.cargo, 100);
+    const tamanhoEquipe = clean(data.tamanho_time || data.tamanho_equipe, 20);
+    const phoneDigits = whatsapp.replace(/\D/g, '');
 
-    // Conectar ao MySQL
-    const connection = await mysql.createConnection({
-      host: process.env.DB_HOST || 'localhost',
-      port: parseInt(process.env.DB_PORT || '3306', 10),
-      database: process.env.DB_DATABASE,
-      user: process.env.DB_USERNAME,
-      password: process.env.DB_PASSWORD,
-    });
+    if (
+      nome.length < 2 ||
+      !emailPattern.test(email) ||
+      phoneDigits.length < 10 ||
+      phoneDigits.length > 15 ||
+      !allowedRoles.has(cargo) ||
+      !allowedTeamSizes.has(tamanhoEquipe)
+    ) {
+      return NextResponse.json({ success: false, message: 'Dados inválidos.' }, { status: 400 });
+    }
 
-    const query = `
-      INSERT INTO leads_captacao (nome, email, whatsapp, empresa, cargo, tamanho_equipe, ip_usuario, user_agent, origem)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-
-    await connection.execute(query, [
+    const { error } = await supabase.from('leads_captacao').insert({
       nome,
       email,
       whatsapp,
-      '', // Empresa (campo ausente no formulário)
+      empresa: '',
       cargo,
-      tamanho_time, // Mapeado para tamanho_equipe da tabela existente
-      ip_usuario,
-      user_agent,
-      origem,
-    ]);
+      tamanho_equipe: tamanhoEquipe,
+      ip_usuario: ip,
+      user_agent: clean(request.headers.get('user-agent'), 500),
+      origem: 'gate-cobchat',
+    });
 
-    await connection.end();
+    if (error) throw error;
 
-    return NextResponse.json(
-      {
-        success: true,
-        message: 'Dados salvos com sucesso!',
-      },
-      {
-        status: 200,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-        },
-      }
-    );
-
+    return NextResponse.json({ success: true, message: 'Dados salvos com sucesso!' });
   } catch (error) {
     console.error('Erro na API salvar_lead:', error);
-    return NextResponse.json(
-      {
-        success: false,
-        message: `Erro ao salvar os dados no banco: ${error.message}`,
-      },
-      {
-        status: 500,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-        },
-      }
-    );
+    return NextResponse.json({ success: false, message: 'Erro ao salvar os dados.' }, { status: 500 });
   }
 }

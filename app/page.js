@@ -17,7 +17,6 @@ import {
   BarChart3,
   Webhook,
   MessageCircle,
-  Plug,
   Check,
   Code2,
   Building2,
@@ -52,7 +51,7 @@ const screenshots = [
     title: 'Gestão de Contatos',
     desc: 'Organize todos os seus devedores com filtros por carteira, etiquetas e ações em massa.',
     image: '/screenshots/screen-contatos.png',
-    badge: 'CRM Integrado',
+    badge: 'Gestão de carteira',
     icon: <Users size={16} />
   },
   {
@@ -60,7 +59,7 @@ const screenshots = [
     title: 'Disparo em Massa',
     desc: 'Envie mensagens personalizadas com templates e variáveis para milhares de contatos.',
     image: '/screenshots/screen-disparo.png',
-    badge: 'Automação',
+    badge: 'Disparo em massa',
     icon: <Send size={16} />
   },
   {
@@ -76,7 +75,7 @@ const screenshots = [
     title: 'Dashboard de Métricas',
     desc: 'Acompanhe KPIs, desempenho da equipe e evolução dos atendimentos em tempo real.',
     image: '/screenshots/screen-dashboard.png',
-    badge: 'Analytics',
+    badge: 'KPI por operador',
     icon: <TrendingUp size={16} />
   },
   {
@@ -86,6 +85,49 @@ const screenshots = [
     image: '/screenshots/screen-painel.png',
     badge: 'Relatórios',
     icon: <PieChart size={16} />
+  }
+];
+
+const FAQS = [
+  {
+    q: 'Preciso trocar meu sistema de cobrança pra usar o CobZap?',
+    a: 'Não. O CobZap conecta ao sistema que você já usa, seja Cobmais, CPJ Cobrança ou outro com API aberta, via API REST e Webhooks. Ele entra como a camada de WhatsApp, não como substituto.'
+  },
+  {
+    q: 'O CobZap substitui o Cobmais ou o CPJ Cobrança?',
+    a: 'Não. Esses sistemas cuidam do cálculo financeiro, régua própria e gestão de carteira. O CobZap cuida do atendimento, disparo em massa e automação dentro do WhatsApp. Um convive com o outro.'
+  },
+  {
+    q: 'Qual o risco real de bloqueio do WhatsApp em cobrança?',
+    a: 'Existe, principalmente via WhatsApp Web sem boas práticas de cadência e relevância. A API Oficial da Meta, por ser homologada, reduz esse risco de forma significativa. Mostramos o comparativo completo antes de você escolher o canal.'
+  },
+  {
+    q: 'API Oficial da Meta ou WhatsApp Web: qual devo escolher?',
+    a: 'Depende do tamanho e do risco que sua operação pode assumir. API Oficial custa mais por conversa mas reduz risco de bloqueio. WhatsApp Web custa menos mas depende do celular ligado e exige mais cuidado de cadência.'
+  },
+  {
+    q: 'O que é WABA e por que preciso dela pra usar API Oficial?',
+    a: 'WABA é a conta comercial homologada pela Meta pra usar a API Oficial do WhatsApp. O CobZap conduz o processo de habilitação, você não precisa entender de configuração técnica pra ter o número aprovado.'
+  },
+  {
+    q: 'Quanto custa o CobZap?',
+    a: 'Escalonado por faixa de usuário: de R$97/usuário/mês (1 a 4 usuários) a R$47/usuário/mês (101+ usuários). Custo adicional de número: R$47/mês (WhatsApp Web) ou R$97/mês (API Oficial), mais tarifa por conversa da Meta quando aplicável. Use o simulador acima pra calcular seu custo exato.'
+  },
+  {
+    q: 'O CobZap gera boleto ou PIX?',
+    a: 'Não. O CobZap insere no WhatsApp o link que seu sistema já gera (boleto, PIX, ou outro), via variável dinâmica. Ele não calcula juros e multa, não concilia pagamento, não substitui o sistema financeiro que você já usa.'
+  },
+  {
+    q: 'Posso integrar o CobZap com meu ERP ou CRM?',
+    a: 'Sim, via API REST e Webhooks, com token por conta. Também suporta n8n, Typebot, Dify e outras ferramentas de automação. Toda integração é feita sob demanda, não existe integração nativa pronta com sistemas específicos hoje.'
+  },
+  {
+    q: 'Quanto tempo leva pra implementar?',
+    a: 'Geralmente de 1 a 3 dias úteis, com onboarding assistido: configuração do número, integração com seu sistema e treinamento da equipe.'
+  },
+  {
+    q: 'Vocês têm algum case de cliente com resultado publicado?',
+    a: 'Ainda não temos um case publicado com nome e autorização de uso. Hoje 10 clientes recorrentes usam o CobZap diariamente, com mais de 20 mil mensagens tratadas por mês na plataforma. Assim que tivermos autorização de um cliente, publicamos aqui com número real.'
   }
 ];
 
@@ -120,8 +162,22 @@ export default function Home() {
   const autoplayTimerRef = useRef(null);
   const touchStartXRef = useRef(0);
 
-  // --- Refs para scroll do Pricing ---
-  const pricingTrackRef = useRef(null);
+  // --- Contexto do WhatsApp (segmento do gate, se já preenchido) ---
+  const [waContext, setWaContext] = useState('');
+
+  useEffect(() => {
+    const stored = localStorage.getItem('cobchat-gate');
+    if (!stored) return;
+    try {
+      const data = JSON.parse(stored);
+      if (data.cargo) {
+        setWaContext(` Sou ${data.cargo.toLowerCase()}.`);
+        localStorage.setItem('cobchat-gate', JSON.stringify({ cargo: data.cargo }));
+      }
+    } catch {
+      localStorage.removeItem('cobchat-gate');
+    }
+  }, []);
 
   // --- Efeito Inicial: Controlar Exibição do Gate ---
   useEffect(() => {
@@ -153,6 +209,29 @@ export default function Home() {
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
+
+  // --- Revelar seções ao rolar (motion, respeita prefers-reduced-motion) ---
+  useEffect(() => {
+    const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const els = document.querySelectorAll('.reveal');
+    if (prefersReducedMotion) {
+      els.forEach((el) => el.classList.add('is-visible'));
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.15 }
+    );
+    els.forEach((el) => observer.observe(el));
+    return () => observer.disconnect();
+  }, []);
 
   // --- Tecla Escape para Fechar o Gate ---
   useEffect(() => {
@@ -196,9 +275,7 @@ export default function Home() {
         email: formData.email.trim(),
         cargo: formData.cargo,
         tamanho_time: formData.tamanho_time,
-        data_cadastro: new Date().toISOString(),
-        user_agent: typeof window !== 'undefined' ? navigator.userAgent : '',
-        origem: 'gate-cobchat'
+        website: e.target?.website?.value || ''
       };
 
       const response = await fetch('/api/salvar_lead', {
@@ -214,7 +291,7 @@ export default function Home() {
       }
 
       setFeedback({ message: 'Dados enviados com sucesso!', type: 'success' });
-      localStorage.setItem('cobchat-gate', JSON.stringify(payload));
+      localStorage.setItem('cobchat-gate', JSON.stringify({ cargo: formData.cargo }));
       
       setTimeout(() => {
         setShowGate(false);
@@ -238,15 +315,18 @@ export default function Home() {
     }
   };
 
-  // --- Carrossel de Preços (Horizontal Scroll) ---
-  const scrollPricing = (direction) => {
-    if (pricingTrackRef.current) {
-      const card = pricingTrackRef.current.querySelector('.pricing-card');
-      if (card) {
-        const amount = (card.getBoundingClientRect().width + 16) * (direction === 'next' ? 1 : -1);
-        pricingTrackRef.current.scrollBy({ left: amount, behavior: 'smooth' });
-      }
-    }
+  // --- Link de WhatsApp por seção, com UTM e contexto do gate ---
+  const buildWaLink = (section, intro) => {
+    const text = `Olá, vim pelo site.\n\n${intro}${waContext}`;
+    const params = new URLSearchParams({ phone: '5541995491030', text });
+    return `https://api.whatsapp.com/send?${params.toString()}&utm_source=site&utm_content=${section}`;
+  };
+
+  // --- Pula pro simulador com um número de usuários pré-definido ---
+  const jumpToSimulator = (usuarios) => {
+    setSimUsuarios(usuarios);
+    const target = document.getElementById('simulador');
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   // --- Cálculos do Simulador (Reativos) ---
@@ -350,14 +430,14 @@ export default function Home() {
         <div className="container">
           <div className="brand">
             <a href="/" onClick={(e) => handleNavLinkClick(e, 'hero')} aria-label="Voltar para a página inicial">
-              <img src="/logo.png" alt="CobZap — Sistema de Cobrança via WhatsApp" width="76" height="50" style={{ height: '50px', width: 'auto' }} />
+              <img src="/logo.png" alt="CobZap, plataforma de WhatsApp para cobrança" width="76" height="50" style={{ height: '50px', width: 'auto' }} />
             </a>
           </div>
           <nav className={`nav-links ${menuOpen ? 'open' : ''}`} id="nav-links" aria-label="Menu principal">
             <a href="#hero" onClick={(e) => handleNavLinkClick(e, 'hero')}>Início</a>
+            <a href="#sobre-cobzap" onClick={(e) => handleNavLinkClick(e, 'sobre-cobzap')}>O que é</a>
+            <a href="#features" onClick={(e) => handleNavLinkClick(e, 'features')}>Como funciona</a>
             <a href="#showcase" onClick={(e) => handleNavLinkClick(e, 'showcase')}>Plataforma</a>
-            <a href="#features" onClick={(e) => handleNavLinkClick(e, 'features')}>Funcionalidades</a>
-            <a href="#how-it-works" onClick={(e) => handleNavLinkClick(e, 'how-it-works')}>Fluxo</a>
             <a href="#pricing" onClick={(e) => handleNavLinkClick(e, 'pricing')}>Planos</a>
           </nav>
           <button
@@ -385,6 +465,15 @@ export default function Home() {
               <p className="muted">Usaremos essas informações para personalizar sua experiência.</p>
             </div>
             <form id="gate-form" className="form-grid" onSubmit={handleGateSubmit} noValidate>
+              {/* Honeypot anti-bot: invisível para humanos, ignorado por leitores de tela */}
+              <input
+                type="text"
+                name="website"
+                tabIndex={-1}
+                autoComplete="off"
+                aria-hidden="true"
+                style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', opacity: 0 }}
+              />
               <div className="form-field">
                 <label htmlFor="gate-nome">Qual é seu nome? <span>*</span></label>
                 <input
@@ -478,22 +567,21 @@ export default function Home() {
         {/* HERO SECTION */}
         <section id="hero" className="hero">
           <div className="container">
-            <div className="hero-copy hero-copy-centered">
-              <div className="pill">WhatsApp para cobrança · Pronto para uso</div>
-              <h1>Converse, negocie e recupere dívidas em uma única experiência.</h1>
-              <p>Automatize cadência, centralize conversas e veja a performance em tempo real. Sem filas, sem burocracia, apenas resultados.</p>
+            <div className="hero-copy hero-copy-centered reveal">
+              <div className="pill">Atendimento, disparo em massa e automação · conectado ao seu sistema atual</div>
+              <h1>A camada de WhatsApp da sua operação de cobrança. Conectada ao sistema que você já tem.</h1>
+              <p>Atendimento multiagente, disparo em massa e régua automatizada, via API Oficial da Meta ou WhatsApp Web. Sem substituir o CRM ou sistema de cobrança que você já usa.</p>
               <div className="cta-row">
                 <a
                   className="solid-btn"
-                  href="https://api.whatsapp.com/send?phone=5541995491030&text=Ol%C3%A1.%20vim%20pelo%20site.%0A%0AGostaria%20de%20mais%20informa%C3%A7%C3%B5es."
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  href="#sobre-cobzap"
+                  onClick={(e) => handleNavLinkClick(e, 'sobre-cobzap')}
                 >
-                  Começar agora
+                  Ver como funciona a integração
                 </a>
                 <a
                   className="ghost-btn"
-                  href="https://api.whatsapp.com/send?phone=5541995491030&text=Ol%C3%A1.%20vim%20pelo%20site.%0A%0AGostaria%20de%20mais%20informa%C3%A7%C3%B5es."
+                  href={buildWaLink('hero', 'Quero falar com um especialista sobre o CobZap.')}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -502,16 +590,16 @@ export default function Home() {
               </div>
               <div className="hero-stats">
                 <div>
-                  <span className="stat-number">+30%</span>
-                  <span className="stat-label">Recuperação média</span>
+                  <span className="stat-number">+20 mil</span>
+                  <span className="stat-label">Mensagens tratadas por mês</span>
                 </div>
                 <div>
-                  <span className="stat-number">75%</span>
-                  <span className="stat-label">Tempo de cobrança menor</span>
+                  <span className="stat-number">10</span>
+                  <span className="stat-label">Operações de cobrança ativas</span>
                 </div>
                 <div>
-                  <span className="stat-number">24/7</span>
-                  <span className="stat-label">Operação ativa</span>
+                  <span className="stat-number">1–3 dias</span>
+                  <span className="stat-label">Tempo de implementação</span>
                 </div>
               </div>
             </div>
@@ -521,37 +609,83 @@ export default function Home() {
         {/* SEÇÃO DE CONTEÚDO DENSO */}
         <section id="sobre-cobzap" className="sobre-section" aria-label="O que é o CobZap">
           <div className="container">
-            <div className="sobre-grid">
+            <div className="sobre-grid reveal">
               <div className="sobre-text">
                 <h2>O que é o CobZap?</h2>
                 <p>
-                  CobZap é um <strong>sistema de cobrança via WhatsApp</strong> desenvolvido para empresas brasileiras que precisam automatizar a recuperação de crédito e a gestão de inadimplência. A plataforma conecta diretamente a <strong>API Oficial da Meta (WhatsApp Business Cloud API)</strong> ou a integração via WhatsApp Web por QR Code, permitindo que assessorias de cobrança, escritórios, call centers, operações de telemarketing e empresas de qualquer segmento cobrem seus clientes de forma automática, escalável e em conformidade com a LGPD.
+                  CobZap é uma <strong>plataforma de WhatsApp para operações de cobrança</strong>: atendimento multiagente, disparo em massa e régua automatizada, conectados à <strong>API Oficial da Meta (WhatsApp Business Cloud API)</strong> ou ao WhatsApp Web.
                 </p>
                 <p>
-                  Com o CobZap é possível criar <strong>réguas de cobrança automatizadas</strong> — sequências programadas de mensagens enviadas em datas e horários estratégicos —, realizar <strong>disparos em massa personalizados</strong> com variáveis dinâmicas (nome, valor da dívida, link de pagamento PIX ou boleto) e centralizar o atendimento de negociação em uma <strong>central multi-agente</strong>, tudo em um único painel. O sistema gera relatórios de performance em tempo real: taxas de resposta, acordos fechados e inadimplência resolvida por operador ou carteira.
+                  O CobZap não substitui o sistema de cobrança que você já usa. Se sua operação roda no <strong>Cobmais</strong>, no <strong>CPJ Cobrança</strong>, ou em qualquer outro sistema com API aberta, o CobZap entra como a camada de WhatsApp: conecta via <strong>API REST e Webhooks</strong>, sem trocar o que já funciona.
                 </p>
                 <p>
-                  Diferente de ferramentas genéricas de WhatsApp, o CobZap foi <strong>projetado especificamente para operações de cobrança</strong>: suporta gestão de múltiplas carteiras por credor (ideal para assessorias), filas inteligentes de atendimento (ideal para call centers) e integração via API REST e Webhooks com qualquer ERP, CRM ou sistema de gestão financeira. Os planos vão de <strong>R$47 a R$97 por usuário/mês</strong>, com escalonamento progressivo conforme o tamanho da operação.
+                  Assessorias de cobrança, escritórios de advocacia, call centers, operações de telemarketing e empresas que cobram os próprios clientes usam o CobZap pra centralizar atendimento, disparar cobrança em massa com variáveis dinâmicas (nome, valor da dívida, link de pagamento) e automatizar a régua por data e horário. Os planos vão de <strong>R$47 a R$97 por usuário/mês</strong>, escalonados pelo tamanho da operação.
                 </p>
               </div>
               <div className="sobre-metricas">
                 <div className="sobre-metrica">
-                  <strong>+30%</strong>
-                  <span>de recuperação média em carteiras usando régua automatizada</span>
+                  <strong>+20 mil</strong>
+                  <span>mensagens tratadas por mês na plataforma</span>
                 </div>
                 <div className="sobre-metrica">
-                  <strong>75%</strong>
-                  <span>menos tempo por operador vs. cobrança manual</span>
-                </div>
-                <div className="sobre-metrica">
-                  <strong>24/7</strong>
-                  <span>operação ativa sem equipe disponível o tempo todo</span>
+                  <strong>10</strong>
+                  <span>operações de cobrança ativas na plataforma hoje</span>
                 </div>
                 <div className="sobre-metrica">
                   <strong>1–3 dias</strong>
                   <span>tempo de implementação com onboarding completo</span>
                 </div>
+                <div className="sobre-metrica">
+                  <strong>API + Webhooks</strong>
+                  <span>integração com o sistema que você já usa, sem substituí-lo</span>
+                </div>
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* OS TRÊS JOBS */}
+        <section id="features" className="section">
+          <div className="container">
+            <div className="section-head reveal">
+              <p className="eyebrow">Os três jobs</p>
+              <h2>Atendimento, disparo em massa e automação. Tudo em WhatsApp.</h2>
+              <p className="lead">Cada job resolve uma parte específica da operação de cobrança, não é WhatsApp genérico com nome novo.</p>
+            </div>
+            <div className="card-grid reveal">
+              <article className="card">
+                <div className="card-icon"><MessageCircle size={24} /></div>
+                <h3>Atendimento</h3>
+                <p>Central multiagente com fila e ticket por carteira. Histórico completo, mesmo se o atendente sair da empresa.</p>
+              </article>
+              <article className="card">
+                <div className="card-icon"><Send size={24} /></div>
+                <h3>Disparo em massa</h3>
+                <p>Envie cobrança pra milhares de contatos com variável de nome, valor da dívida e link de pagamento, gerado pelo seu sistema.</p>
+              </article>
+              <article className="card">
+                <div className="card-icon"><RefreshCw size={24} /></div>
+                <h3>Automação</h3>
+                <p>Régua de cobrança programada por data e horário. Sequência automática, sem depender de alguém lembrar de mandar a próxima mensagem.</p>
+              </article>
+            </div>
+            <div className="cta-row">
+              <a
+                className="solid-btn"
+                href={buildWaLink('jobs', 'Quero saber mais sobre atendimento, disparo em massa e automação.')}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Começar agora
+              </a>
+              <a
+                className="ghost-btn"
+                href={buildWaLink('jobs', 'Quero falar com um especialista sobre o CobZap.')}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Falar com especialista
+              </a>
             </div>
           </div>
         </section>
@@ -559,7 +693,7 @@ export default function Home() {
         {/* SCREENSHOT CAROUSEL */}
         <section id="showcase" className="product-showcase">
           <div className="container">
-            <div className="showcase-header">
+            <div className="showcase-header reveal">
               <span className="eyebrow">Veja na Prática</span>
               <h2>Conheça a plataforma por dentro</h2>
               <p className="lead">Uma interface moderna e intuitiva projetada para maximizar sua produtividade em cobrança.</p>
@@ -655,124 +789,18 @@ export default function Home() {
           </div>
         </section>
 
-        {/* FEATURES SECTION */}
-        <section id="features" className="section">
-          <div className="container">
-            <div className="section-head">
-              <p className="eyebrow">O que você leva</p>
-              <h2>Ferramentas para cobrar sem esforço.</h2>
-              <p className="lead">Configure automações, templates e jornadas com poucos cliques.</p>
-              <div className="cta-row">
-                <a
-                  className="solid-btn"
-                  href="https://api.whatsapp.com/send?phone=5541995491030&text=Ol%C3%A1.%20vim%20pelo%20site.%0A%0AGostaria%20de%20mais%20informa%C3%A7%C3%B5es."
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Começar agora
-                </a>
-                <a
-                  className="ghost-btn"
-                  href="https://api.whatsapp.com/send?phone=5541995491030&text=Ol%C3%A1.%20vim%20pelo%20site.%0A%0AGostaria%20de%20mais%20informa%C3%A7%C3%B5es."
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Falar com especialista
-                </a>
-              </div>
-            </div>
-            <div className="card-grid">
-              <article className="card">
-                <div className="card-icon"><MessageCircle size={24} /></div>
-                <h3>Templates prontos</h3>
-                <p>Modelos aprovados que reduzem objeções e aceleram acordos.</p>
-              </article>
-              <article className="card">
-                <div className="card-icon"><TrendingUp size={24} /></div>
-                <h3>Monitoramento em tempo real</h3>
-                <p>Taxas de resposta, tickets abertos e acordos em uma só visão.</p>
-              </article>
-              <article className="card">
-                <div className="card-icon"><Plug size={24} /></div>
-                <h3>Integração fácil</h3>
-                <p>Webhook, API e importação rápida via planilha.</p>
-              </article>
-            </div>
-          </div>
-        </section>
-
-        {/* HOW IT WORKS SECTION */}
-        <section id="how-it-works" className="section inverted">
-          <div className="container">
-            <div className="section-head">
-              <p className="eyebrow">Fluxo</p>
-              <h2>Do lead à negociação em três passos.</h2>
-              <div className="cta-row">
-                <a
-                  className="solid-btn"
-                  href="https://api.whatsapp.com/send?phone=5541995491030&text=Ol%C3%A1.%20vim%20pelo%20site.%0A%0AGostaria%20de%20mais%20informa%C3%A7%C3%B5es."
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Começar agora
-                </a>
-                <a
-                  className="ghost-btn"
-                  href="https://api.whatsapp.com/send?phone=5541995491030&text=Ol%C3%A1.%20vim%20pelo%20site.%0A%0AGostaria%20de%20mais%20informa%C3%A7%C3%B5es."
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Falar com especialista
-                </a>
-              </div>
-            </div>
-            <div className="steps-grid">
-              <div className="step-card">
-                <span className="step-index">1</span>
-                <h3>Captar</h3>
-                <p>Coletamos dados essenciais em segundos e já validamos o contato.</p>
-                <ul>
-                  <li><Check size={16} /> Formulário com validação</li>
-                  <li><Check size={16} /> Leads salvos no navegador</li>
-                  <li><Check size={16} /> Pronto para exportar</li>
-                </ul>
-              </div>
-              <div className="step-card">
-                <span className="step-index">2</span>
-                <h3>Automatizar</h3>
-                <p>Defina templates, horários e regra de follow-up.</p>
-                <ul>
-                  <li><Check size={16} /> Mensagens sequenciais</li>
-                  <li><Check size={16} /> Alertas de resposta</li>
-                  <li><Check size={16} /> Gatilhos de valor</li>
-                </ul>
-              </div>
-              <div className="step-card">
-                <span className="step-index">3</span>
-                <h3>Negociar</h3>
-                <p>Converse, negocie e finalize sem sair do fluxo.</p>
-                <ul>
-                  <li><Check size={16} /> Histórico organizado</li>
-                  <li><Check size={16} /> Indicadores de sucesso</li>
-                  <li><Check size={16} /> Exportação rápida</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </section>
-
         {/* API WHATSAPP SECTION */}
         <section id="api-whatsapp" className="section">
           <div className="container">
-            <div className="section-head">
+            <div className="section-head reveal">
               <p className="eyebrow">Tecnologia & API</p>
-              <h2>A melhor API de WhatsApp do mercado para cobranças</h2>
-              <p className="lead">Conectividade robusta com a API Oficial Cloud da Meta ou integração via WhatsApp Web para o seu sistema.</p>
+              <h2>Duas formas de conectar. Comparamos antes de você decidir.</h2>
+              <p className="lead">Envio em massa por WhatsApp Web sem boas práticas de cadência tem risco real de bloqueio. A API Oficial da Meta é homologada e reduz esse risco de forma significativa, mas custa mais por conversa. Veja o comparativo completo antes de escolher.</p>
             </div>
-            <div className="api-grid">
+            <div className="api-grid reveal">
               <div className="api-text-block">
                 <h3>O que é a API de WhatsApp para cobrança do CobZap?</h3>
-                <p>A <strong>API de WhatsApp</strong> do CobZap é uma infraestrutura de mensageria projetada especificamente para automatizar o envio de cobranças, notificações de vencimento, réguas de relacionamento e acordos financeiros. Nossa API REST se integra facilmente a qualquer ERP, CRM ou banco de dados, permitindo disparos em massa automáticos e em tempo real.</p>
+                <p>A <strong>API de WhatsApp</strong> do CobZap conecta seu sistema à API Oficial da Meta ou ao WhatsApp Web, especificamente configurada para atendimento, disparo em massa e automação de cobrança. Nossa API REST se integra facilmente a qualquer ERP, CRM ou banco de dados, permitindo disparos em massa automáticos e em tempo real.</p>
 
                 <div className="api-features-list">
                   <div className="api-feature-item">
@@ -806,13 +834,13 @@ export default function Home() {
                   <tbody>
                     <tr>
                       <td><strong>Risco de Bloqueio</strong></td>
-                      <td>Praticamente zero (Homologado)</td>
-                      <td>Moderado (Requer boas práticas)</td>
+                      <td>Baixo (canal homologado)</td>
+                      <td>Existe, aumenta sem boas práticas de cadência</td>
                     </tr>
                     <tr>
-                      <td><strong>Estabilidade</strong></td>
-                      <td>100% (Servidores Meta)</td>
-                      <td>Depende do celular ativo</td>
+                      <td><strong>Depende do celular ligado</strong></td>
+                      <td>Não</td>
+                      <td>Sim</td>
                     </tr>
                     <tr>
                       <td><strong>Mensagens/Segundo</strong></td>
@@ -839,9 +867,9 @@ export default function Home() {
         {/* SEGMENTOS SECTION */}
         <section id="segmentos" className="section">
           <div className="container">
-            <div className="section-head">
+            <div className="section-head reveal">
               <p className="eyebrow">Para quem é</p>
-              <h2>Do call center à escola — qualquer cobrança, um sistema só.</h2>
+              <h2>Feito para quem cobra. Escritório, assessoria, ou operação própria.</h2>
               <p className="lead">Feito para quem vive de cobrança, e para quem precisa cobrar sem sair do seu negócio.</p>
             </div>
 
@@ -864,12 +892,12 @@ export default function Home() {
 
               <div className="segmento-card primary">
                 <div className="segmento-icon"><Scale size={24} /></div>
-                <h3>Escritórios de Cobrança</h3>
-                <p>Automatize a régua amigável antes do processo judicial. Reduza custos operacionais, aumente a taxa de acordo pré-litigioso e documente cada interação automaticamente.</p>
+                <h3>Escritórios de Advocacia</h3>
+                <p>Gestão de carteira por processo, comunicação alinhada ao CDC e histórico auditável. Automatize a régua amigável antes do processo judicial.</p>
                 <ul>
                   <li><Check size={14} /> Régua pré-jurídica automatizada</li>
                   <li><Check size={14} /> Acordos e parcelamentos via chat</li>
-                  <li><Check size={14} /> Histórico completo exportável</li>
+                  <li><Check size={14} /> Histórico completo e auditável</li>
                 </ul>
               </div>
 
@@ -917,7 +945,7 @@ export default function Home() {
               <div className="segmento-card">
                 <div className="segmento-icon"><ShoppingBag size={24} /></div>
                 <h3>Varejo & E-commerce</h3>
-                <p>Recupere crediários (carnês), vendas não pagas via boleto ou PIX com lembretes automáticos e links de pagamento direto no WhatsApp.</p>
+                <p>Cobre crediários (carnês) e vendas em aberto com lembretes automáticos, inserindo no WhatsApp o link de boleto ou PIX que seu sistema já gera.</p>
                 <ul>
                   <li><Check size={14} /> Boletos e PIX pendentes</li>
                   <li><Check size={14} /> Lembretes de crediário/carnê</li>
@@ -953,127 +981,42 @@ export default function Home() {
         {/* PRICING SECTION */}
         <section id="pricing" className="section inverted">
           <div className="container">
-            <div className="section-head">
+            <div className="section-head reveal">
               <p className="eyebrow">Planos</p>
-              <h2>Cresça com o volume do seu time.</h2>
-              <div className="cta-row">
-                <a
-                  className="solid-btn"
-                  href="https://api.whatsapp.com/send?phone=5541995491030&text=Ol%C3%A1.%20vim%20pelo%20site.%0A%0AGostaria%20de%20mais%20informa%C3%A7%C3%B5es."
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Começar agora
-                </a>
-                <a
-                  className="ghost-btn"
-                  href="https://api.whatsapp.com/send?phone=5541995491030&text=Ol%C3%A1.%20vim%20pelo%20site.%0A%0AGostaria%20de%20mais%20informa%C3%A7%C3%B5es."
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Falar com especialista
-                </a>
-              </div>
+              <h2>Você já viu o que o CobZap faz. Aqui está quanto custa.</h2>
+              <p className="lead">Escolha o tamanho do seu time e simule o valor exato pra sua operação.</p>
             </div>
-            <div className="pricing-carousel">
-              <button className="carousel-btn prev" onClick={() => scrollPricing('prev')} aria-label="Plano anterior">
-                <ChevronLeft size={24} />
+            <div className="card-grid reveal">
+              <button className="card" type="button" onClick={() => jumpToSimulator(10)}>
+                <div className="card-icon"><Users size={24} /></div>
+                <h3>Times pequenos</h3>
+                <p>1 a 20 usuários, a partir de R$77/usuário/mês. Simular meu custo exato.</p>
               </button>
-              <div className="pricing-track" id="pricing-track" ref={pricingTrackRef}>
-                <div className="pricing-card">
-                  <p className="eyebrow">Essencial</p>
-                  <h3>R$97,00 <span>/usuário/mês</span></h3>
-                  <p>1 a 4 usuários</p>
-                  <ul>
-                    <li><Check size={14} /> Custo número WhatsApp Web: R$47/mês</li>
-                    <li><Check size={14} /> Custo número Oficial Meta: R$97/mês</li>
-                    <li><Check size={14} /> Custo conversa (24h): R$0,12</li>
-                    <li><Check size={14} /> Marketing por mensagem: R$0,47</li>
-                  </ul>
-                </div>
-                <div className="pricing-card featured">
-                  <span className="plan-badge">Mais escolhido</span>
-                  <p className="eyebrow">Padrão</p>
-                  <h3>R$87,00 <span>/usuário/mês</span></h3>
-                  <p>5 a 10 usuários</p>
-                  <ul>
-                    <li><Check size={14} /> Custo número WhatsApp Web: R$47/mês</li>
-                    <li><Check size={14} /> Custo número Oficial Meta: R$97/mês</li>
-                    <li><Check size={14} /> Custo conversa (24h): R$0,12</li>
-                    <li><Check size={14} /> Marketing por mensagem: R$0,47</li>
-                  </ul>
-                </div>
-                <div className="pricing-card">
-                  <p className="eyebrow">Profissional</p>
-                  <h3>R$77,00 <span>/usuário/mês</span></h3>
-                  <p>11 a 20 usuários</p>
-                  <ul>
-                    <li><Check size={14} /> Custo número WhatsApp Web: R$47/mês</li>
-                    <li><Check size={14} /> Custo número Oficial Meta: R$97/mês</li>
-                    <li><Check size={14} /> Custo conversa (24h): R$0,12</li>
-                    <li><Check size={14} /> Marketing por mensagem: R$0,47</li>
-                  </ul>
-                </div>
-                <div className="pricing-card">
-                  <p className="eyebrow">Avançado</p>
-                  <h3>R$67,00 <span>/usuário/mês</span></h3>
-                  <p>21 a 50 usuários</p>
-                  <ul>
-                    <li><Check size={14} /> Custo número WhatsApp Web: R$47/mês</li>
-                    <li><Check size={14} /> Custo número Oficial Meta: R$97/mês</li>
-                    <li><Check size={14} /> Custo conversa (24h): R$0,12</li>
-                    <li><Check size={14} /> Marketing por mensagem: R$0,47</li>
-                  </ul>
-                </div>
-                <div className="pricing-card">
-                  <p className="eyebrow">Business</p>
-                  <h3>R$57,00 <span>/usuário/mês</span></h3>
-                  <p>51 a 100 usuários</p>
-                  <ul>
-                    <li><Check size={14} /> Custo número WhatsApp Web: R$47/mês</li>
-                    <li><Check size={14} /> Custo número Oficial Meta: R$97/mês</li>
-                    <li><Check size={14} /> Custo conversa (24h): R$0,12</li>
-                    <li><Check size={14} /> Marketing por mensagem: R$0,47</li>
-                  </ul>
-                </div>
-                <div className="pricing-card">
-                  <p className="eyebrow">Corporativo</p>
-                  <h3>R$47,00 <span>/usuário/mês</span></h3>
-                  <p>101+ usuários</p>
-                  <ul>
-                    <li><Check size={14} /> Custo número WhatsApp Web: R$47/mês</li>
-                    <li><Check size={14} /> Custo número Oficial Meta: R$97/mês</li>
-                    <li><Check size={14} /> Custo conversa (24h): R$0,12</li>
-                    <li><Check size={14} /> Marketing por mensagem: R$0,47</li>
-                  </ul>
-                </div>
-              </div>
-              <button className="carousel-btn next" onClick={() => scrollPricing('next')} aria-label="Próximo plano">
-                <ChevronRight size={24} />
+              <button className="card" type="button" onClick={() => jumpToSimulator(50)}>
+                <div className="card-icon"><Users size={24} /></div>
+                <h3>Times médios</h3>
+                <p>21 a 100 usuários, a partir de R$57/usuário/mês. Simular meu custo exato.</p>
+              </button>
+              <button className="card" type="button" onClick={() => jumpToSimulator(120)}>
+                <div className="card-icon"><Users size={24} /></div>
+                <h3>Times grandes</h3>
+                <p>101+ usuários, a partir de R$47/usuário/mês. Simular meu custo exato.</p>
               </button>
             </div>
           </div>
         </section>
 
         {/* SIMULADOR SECTION */}
-        <section id="simulador" class="section">
+        <section id="simulador" className="section">
           <div className="container">
-            <div className="section-head">
+            <div className="section-head reveal">
               <p className="eyebrow">Simulador</p>
               <h2>Calcule seu custo mensal</h2>
-              <p className="lead">Informe usuários, números e volume de mensagens para ver o valor estimado.</p>
+              <p className="lead">Informe usuários, números e volume de mensagens para ver o valor estimado. Sem letra miúda, o valor que aparece aqui é o valor que vem na fatura.</p>
               <div className="cta-row">
                 <a
                   className="solid-btn"
-                  href="https://api.whatsapp.com/send?phone=5541995491030&text=Ol%C3%A1.%20vim%20pelo%20site.%0A%0AGostaria%20de%20mais%20informa%C3%A7%C3%B5es."
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Começar agora
-                </a>
-                <a
-                  className="ghost-btn"
-                  href="https://api.whatsapp.com/send?phone=5541995491030&text=Ol%C3%A1.%20vim%20pelo%20site.%0A%0AGostaria%20de%20mais%20informa%C3%A7%C3%B5es."
+                  href={buildWaLink('simulador', `Simulei ${simResult.total}/mês pra ${simUsuarios} usuários no site, quero falar com especialista.`)}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -1141,28 +1084,28 @@ export default function Home() {
         {/* SEGURANÇA SECTION */}
         <section id="seguranca" className="section inverted">
           <div className="container">
-            <div className="section-head">
+            <div className="section-head reveal">
               <p className="eyebrow">Segurança & LGPD</p>
-              <h2>Seus dados e de seus clientes totalmente protegidos</h2>
-              <p className="lead">Trabalhamos com os mais altos padrões de segurança para garantir a integridade da sua operação de cobrança.</p>
+              <h2>Seus dados e os dos seus devedores, protegidos</h2>
+              <p className="lead">Dado de dívida é dado sensível. Tratamos assim.</p>
             </div>
-            <div className="seguranca-grid">
+            <div className="seguranca-grid reveal">
               <div className="seguranca-card">
                 <div className="seguranca-icon"><Shield size={24} /></div>
-                <h3>Conformidade 100% com a LGPD</h3>
-                <p>Nosso sistema foi desenvolvido seguindo os princípios da Lei Geral de Proteção de Dados (LGPD). Garantimos o tratamento ético, seguro e legal de todas as informações pessoais e financeiras de seus clientes devedores.</p>
+                <h3>Conformidade com a LGPD</h3>
+                <p>Tratamento de dados sob base legal de execução de contrato e legítimo interesse, seguindo os princípios da Lei Geral de Proteção de Dados.</p>
               </div>
 
               <div className="seguranca-card">
                 <div className="seguranca-icon"><Lock size={24} /></div>
-                <h3>Criptografia de ponta a ponta</h3>
-                <p>Todas as comunicações realizadas através da nossa API de WhatsApp são criptografadas, assegurando que informações sensíveis sobre débitos e negociações não sejam interceptadas por terceiros.</p>
+                <h3>Criptografia em trânsito</h3>
+                <p>Comunicação criptografada em trânsito, conforme padrão do WhatsApp Business API, para dados sensíveis de débito e negociação.</p>
               </div>
 
               <div className="seguranca-card">
                 <div className="seguranca-icon"><Server size={24} /></div>
                 <h3>Servidores e Backups seguros</h3>
-                <p>Hospedagem em nuvem de alta confiabilidade com replicação de dados e backups diários automáticos. Garantia de disponibilidade e segurança contra perda de histórico ou métricas importantes.</p>
+                <p>Hospedagem em nuvem com replicação de dados e backups diários automáticos, reduzindo o risco de perda de histórico ou métricas importantes.</p>
               </div>
             </div>
           </div>
@@ -1171,54 +1114,13 @@ export default function Home() {
         {/* FAQ SECTION */}
         <section id="faq" className="section">
           <div className="container">
-            <div className="section-head">
+            <div className="section-head reveal">
               <p className="eyebrow">FAQ</p>
               <h2>Perguntas frequentes</h2>
               <p className="lead">Tudo o que você precisa saber antes de começar.</p>
             </div>
-            <div className="faq-list">
-              {[
-                {
-                  q: 'O que é o CobZap?',
-                  a: 'CobZap é um sistema de cobrança via WhatsApp que conecta a API Oficial da Meta (Cloud API) ou WhatsApp Web para automatizar réguas de cobrança, disparo em massa e gestão de devedores, com dashboard em tempo real e conformidade com LGPD.'
-                },
-                {
-                  q: 'O CobZap usa a API Oficial do WhatsApp da Meta?',
-                  a: 'Sim. O CobZap oferece duas modalidades: a API Oficial Cloud da Meta, homologada com risco de bloqueio praticamente zero e estabilidade de 100%, e a integração via WhatsApp Web (QR Code), mais indicada para pequenas e médias operações. A API Oficial custa R$97/mês por número, mais a tarifa por conversa da Meta.'
-                },
-                {
-                  q: 'Qual a diferença entre API Oficial Meta e WhatsApp Web?',
-                  a: 'A API Oficial da Meta tem risco de bloqueio praticamente zero, estabilidade de 100% e capacidade ilimitada de mensagens por segundo, mas cobra tarifa por conversa (R$0,12/conversa de utilidade). A conexão via WhatsApp Web custa R$47/mês por número com mensagens ilimitadas sem tarifa adicional, mas depende do celular estar ativo e tem risco moderado de bloqueio sem boas práticas.'
-                },
-                {
-                  q: 'Quanto custa o CobZap?',
-                  a: 'O CobZap cobra por usuário/mês de forma escalonada: R$97 para 1–4 usuários (Essencial), R$87 para 5–10 (Padrão), R$77 para 11–20 (Profissional), R$67 para 21–50 (Avançado), R$57 para 51–100 (Business) e R$47 para 101+ (Corporativo). Somam-se os custos de números (WhatsApp Web R$47/mês ou API Oficial R$97/mês) e tarifas por mensagem.'
-                },
-                {
-                  q: 'Posso integrar o CobZap com meu ERP ou CRM?',
-                  a: 'Sim. O CobZap oferece API REST e Webhooks completos para integração com qualquer ERP, CRM ou banco de dados. Também suporta importação e exportação via planilha (Excel/CSV) para operações sem equipe técnica.'
-                },
-                {
-                  q: 'O CobZap é compatível com LGPD?',
-                  a: 'Sim. A plataforma foi desenvolvida seguindo os princípios da LGPD. Todas as comunicações são criptografadas de ponta a ponta, os dados ficam em nuvem com backups diários automáticos e o sistema garante o tratamento ético e legal de informações pessoais e financeiras.'
-                },
-                {
-                  q: 'Enviar muitas mensagens pelo WhatsApp gera bloqueios?',
-                  a: 'Com a API Oficial da Meta, o risco é praticamente zero, pois é um canal homologado. Com WhatsApp Web, bloqueios podem ocorrer sem boas práticas de cadência e relevância. O CobZap entrega a plataforma configurada com estratégias para minimizar riscos em qualquer modalidade.'
-                },
-                {
-                  q: 'O CobZap permite envio de boletos e links de pagamento?',
-                  a: 'Sim. É possível enviar boletos, links de pagamento PIX e qualquer arquivo via WhatsApp com mensagens personalizadas. Os templates suportam variáveis dinâmicas como nome do cliente, valor da dívida e link de pagamento.'
-                },
-                {
-                  q: 'Para quais segmentos o CobZap é indicado?',
-                  a: 'O CobZap foi criado principalmente para empresas especializadas em cobrança: assessorias de cobrança, escritórios de cobrança amigável e jurídico, call centers e operações de telemarketing e recuperação ativa de crédito. Além disso, atende diretamente empresas que cobram seus próprios clientes: instituições de ensino (mensalidades), varejo e e-commerce (boletos, PIX e crediário), provedores de internet e SaaS (assinaturas) e clínicas e prestadores de serviços.'
-                },
-                {
-                  q: 'Como começo a usar o CobZap?',
-                  a: 'Entre em contato pelo WhatsApp (41) 99549-1030 ou pelo e-mail contato@cobzap.com. A equipe faz o onboarding completo: configuração do número, integração com seus sistemas e treinamento da equipe. O tempo de implementação é geralmente de 1 a 3 dias úteis.'
-                }
-              ].map((item, index) => (
+            <div className="faq-list reveal">
+              {FAQS.map((item, index) => (
                 <article className={`faq-item ${openFaqIndex === index ? 'open' : ''}`} key={index}>
                   <button className="faq-question" onClick={() => toggleFaq(index)} aria-expanded={openFaqIndex === index}>
                     {item.q}
@@ -1230,8 +1132,33 @@ export default function Home() {
                 </article>
               ))}
             </div>
+            <div className="cta-row" style={{ marginTop: '2rem' }}>
+              <a
+                className="solid-btn"
+                href={buildWaLink('faq', 'Ainda tenho uma dúvida sobre o CobZap.')}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Ainda com dúvida? Fala com a gente
+              </a>
+            </div>
           </div>
         </section>
+
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              '@context': 'https://schema.org',
+              '@type': 'FAQPage',
+              mainEntity: FAQS.map((item) => ({
+                '@type': 'Question',
+                name: item.q,
+                acceptedAnswer: { '@type': 'Answer', text: item.a }
+              }))
+            })
+          }}
+        />
       </main>
 
       {/* FOOTER */}
@@ -1240,10 +1167,10 @@ export default function Home() {
           <div>
             <div className="brand">
               <a href="#" onClick={(e) => handleNavLinkClick(e, 'hero')} aria-label="Voltar para a página inicial">
-                <img src="/logo.png" alt="CobZap — Sistema de Cobrança via WhatsApp" width="122" height="80" style={{ height: '80px', width: 'auto' }} />
+                <img src="/logo.png" alt="CobZap, plataforma de WhatsApp para cobrança" width="122" height="80" style={{ height: '80px', width: 'auto' }} />
               </a>
             </div>
-            <p className="muted">Sistema de WhatsApp inteligente para cobrança.</p>
+            <p className="muted">Plataforma de WhatsApp para operações de cobrança.</p>
           </div>
           <div>
             <h4>Links</h4>
@@ -1262,7 +1189,7 @@ export default function Home() {
               <a href="https://www.linkedin.com/company/cobzap" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn">
                 <Linkedin size={18} />
               </a>
-              <a href="https://www.instagram.com/cobzap/#" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+              <a href="https://www.instagram.com/cobzap/" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
                 <Instagram size={18} />
               </a>
               <a href="https://www.facebook.com/profile.php?id=61584667976947" target="_blank" rel="noopener noreferrer" aria-label="Facebook">
