@@ -1,0 +1,12 @@
+.env
+.env.local
+.agent
+.agents
+.claude
+.cline
+.codex
+.gemini
+.github
+.opencode
+.mcp.json
+skills-lock.json
